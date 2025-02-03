@@ -73,11 +73,23 @@ let
     let
       systemCfg = cfg.nixos.hosts.${name};
       systemMetadataFile = "${configBase}/${systemCfg.metadataFilename}";
-      systemMetadata =
+      systemMetadataImported =
         if systemCfg.metadataFilename != null && fileExists systemMetadataFile then
           import systemMetadataFile
         else
           { };
+      systemMetadata =
+        if isFunction systemMetadataImported then
+          systemMetadataImported {
+            inherit
+              inputs
+              lib
+              nix-utils-lib
+              self
+              ;
+          }
+        else
+          systemMetadataImported;
 
       getMetadata = name: systemMetadata.${name} or systemCfg.${name};
       getMetadata' = default: name: systemMetadata.${name} or systemCfg.${name} or default;
@@ -103,7 +115,8 @@ let
         if getMetadata "importAllOverlays" then
           attrValues self.overlays
         else
-          attrValues (filterAttrs (name: _: elem name importedOverlays) self.overlays);
+          attrValues (filterAttrs (name: _: elem name importedOverlays) self.overlays)
+          ++ getMetadata "inlineOverlays";
 
       homeManager = if getMetadata "addHomeManager" then cfg.versions.${version}.home-manager else null;
 
@@ -418,19 +431,25 @@ in
           importedModules = mkOption {
             type = with types; listOf str;
             default = [ ];
-            description = "List of flake-defined NixOS modules imported by all configurations.";
+            description = "List of flake-defined NixOS modules to import.";
           };
 
           importedOverlays = mkOption {
             type = with types; listOf str;
             default = [ ];
-            description = "List of flake-defined NixOS overlays imported by all configurations.";
+            description = "List of flake-defined NixOS overlays to import.";
           };
 
           inlineModules = mkOption {
             type = with types; listOf deferredModule;
             default = [ ];
-            description = "Inline modules imported by all configurations.";
+            description = "Inline modules to import.";
+          };
+
+          inlineOverlays = mkOption {
+            type = with types; listOf anything;
+            default = [ ];
+            description = "Inline overlays to import.";
           };
 
           metadataFilename = mkOption {
@@ -494,13 +513,13 @@ in
           importedModules = mkOption {
             type = with types; listOf str;
             default = [ ];
-            description = "List of home-manager modules imported by all configurations.";
+            description = "List of flake-defined home-manager modules to import.";
           };
 
           inlineModules = mkOption {
             type = with types; listOf deferredModule;
             default = [ ];
-            description = "Inline modules imported by all configurations.";
+            description = "Inline modules to import.";
           };
 
           metadataFilename = mkOption {
