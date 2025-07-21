@@ -112,11 +112,13 @@ let
         )
         ++ getMetadata "inlineModules";
       overlays =
-        if getMetadata "importAllOverlays" then
-          attrValues self.overlays
-        else
-          attrValues (filterAttrs (name: _: elem name importedOverlays) self.overlays)
-          ++ getMetadata "inlineOverlays";
+        (
+          if getMetadata "importAllOverlays" then
+            attrValues self.overlays
+          else
+            attrValues (filterAttrs (name: _: elem name importedOverlays) self.overlays)
+        )
+        ++ getMetadata "inlineOverlays";
 
       homeManager = if getMetadata "addHomeManager" then cfg.versions.${version}.home-manager else null;
 
