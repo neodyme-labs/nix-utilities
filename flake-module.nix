@@ -86,6 +86,7 @@ let
               lib
               nix-utils-lib
               self
+              top
               ;
           }
         else
