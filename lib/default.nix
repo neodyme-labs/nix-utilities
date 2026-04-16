@@ -1,11 +1,32 @@
-{ lib }@args:
+{ lib }:
 
-with lib;
-with builtins;
-let
-  excluded = [ "default.nix" ];
-in
-mapAttrs' (name: type: {
-  name = if type == "regular" then removeSuffix ".nix" name else name;
-  value = import (./. + "/${name}") args;
-}) (filterAttrs (name: _: !elem name excluded) (readDir ./.))
+lib.makeExtensible (
+  self:
+  let
+    callLibs =
+      file:
+      import file {
+        inherit lib;
+
+        nix-utils-lib = self;
+      };
+  in
+  rec {
+    files = callLibs ./files.nix;
+    functions = callLibs ./functions.nix;
+    imports = callLibs ./imports.nix;
+
+    inherit (files) verifyFileType;
+
+    inherit (functions)
+      callWith
+      callWithIfNestedFunc
+      mockCall'
+      mockCall
+      mockEval'
+      mockEval
+      ;
+
+    inherit (imports) isDirectoryIncludible readImportablePaths;
+  }
+)

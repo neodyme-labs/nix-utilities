@@ -2,66 +2,34 @@
   description = "Utility modules for NixOS and nixpkgs lib";
 
   inputs = {
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs-lib.url = "github:nix-community/nixpkgs.lib";
 
-    pre-commit-hooks = {
-      url = "github:cachix/pre-commit-hooks.nix";
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
 
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
-
-    treefmt-nix = {
-      url = "github:numtide/treefmt-nix";
-
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
+      inputs.nixpkgs-lib.follows = "nixpkgs-lib";
     };
   };
 
   outputs =
     inputs@{ flake-parts, ... }:
     let
-      nix-utils-lib = import ./lib { inherit (inputs.nixpkgs) lib; };
+      nix-utils-lib = import ./lib { inherit (inputs.nixpkgs-lib) lib; };
     in
     flake-parts.lib.mkFlake { inherit inputs; } (
-      { flake-parts-lib, withSystem, ... }:
+      { flake-parts-lib, ... }:
       let
-        inherit (flake-parts-lib) importApply;
-
-        flakeModules.default = importApply ./flake-module.nix { inherit nix-utils-lib withSystem; };
+        dogfood = flake-parts-lib.importApply ./flake-modules/default.nix {
+          inherit flake-parts nix-utils-lib;
+        };
       in
       {
-        # Include required systems
         systems = [ "x86_64-linux" ];
+        imports = [ dogfood ];
 
-        imports = [
-          flakeModules.default
-          inputs.pre-commit-hooks.flakeModule
-          inputs.treefmt-nix.flakeModule
-        ];
+        nixUtilities.root = ./.;
 
-        nixUtilities = {
-          root = ./.;
-        };
-
-        perSystem = {
-          treefmt = {
-            programs.mdformat.enable = true;
-
-            settings.global.excludes = [
-              ".idea/*"
-              "*.iml"
-            ];
-          };
-        };
-
-        flake = rec {
-          inherit flakeModules;
-
+        flake = {
           lib = nix-utils-lib;
         };
       }

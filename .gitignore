@@ -117,6 +117,3 @@ fabric.properties
 # Nix / environment specific
 result
 .pre-commit-config.yaml
-
-# Example
-example/flake.lock
