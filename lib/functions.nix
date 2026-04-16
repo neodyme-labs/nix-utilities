@@ -68,25 +68,24 @@ rec {
   callWithIfNestedFunc =
     numLevels: func: arguments:
     let
-      eval = mockEval' numLevels func;
+      arity =
+        f:
+        if isFunction f then
+          let
+            args = functionArgs f;
+
+            mockArg = builtins.listToAttrs (
+              map (name: {
+                inherit name;
+                value = throw "peek";
+              }) (builtins.attrNames args)
+            );
+
+            attempt = builtins.tryEval (f mockArg);
+          in
+          if attempt.success && isFunction attempt.value then 1 + arity attempt.value else 1
+        else
+          0;
     in
-    if (isFunction func && eval.success && isFunction eval.value) then
-      callWith func arguments
-    else
-      func;
-
-  mockCall' =
-    count: func:
-    if count > 0 && isFunction func then
-      mockCall' (count - 1) (
-        func (mapAttrs (_: _: null) (lib.filterAttrs (_: hasDefault: !hasDefault) (functionArgs func)))
-      )
-    else
-      func;
-
-  mockCall = mockCall' 1;
-
-  mockEval' = count: func: builtins.tryEval (mockCall' count func);
-
-  mockEval = mockEval' 1;
+    if (arity func > numLevels) then callWith func arguments else func;
 }

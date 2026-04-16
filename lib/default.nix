@@ -18,14 +18,7 @@ lib.makeExtensible (
 
     inherit (files) verifyFileType;
 
-    inherit (functions)
-      callWith
-      callWithIfNestedFunc
-      mockCall'
-      mockCall
-      mockEval'
-      mockEval
-      ;
+    inherit (functions) callWith callWithIfNestedFunc;
 
     inherit (imports) isDirectoryIncludible readImportablePaths;
   }
