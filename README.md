@@ -118,7 +118,7 @@ The following extra arguments are passed to regular file homes, if they are in t
 Provided via flake: [`partition-homeManager-module`](./flake-modules/partition-homeManager-module.nix) \
 Automatically imported: Yes, if not overridden
 
-This module iterates over the directory configured by the `homeModulePath` module argument and imports all nix files, except `flake.nix` and `flake-module.nix`, as well as all base-level directories, which include a `default.nix` file, exposing them through the flake-parts `flake.homeModule` interface.
+The module includes either the `default.nix` file, should it be present, or recursively finds all nix files (traversing non-includible directories) and includible directories. Base-level files with the names `flake.nix`, and `flake-module.nix` will be ignored. The base directory for those looksups is taken from the module argument `homeModulePath`. All such discovered modules are exposed through a single module importing all of them at the flake-parts `flake.homeModule` interface.
 
 The following extra arguments are passed to modules, if they are in the format `extraArgs: args: { ... }`:
 
@@ -131,7 +131,7 @@ The following extra arguments are passed to modules, if they are in the format `
 Provided via flake: [`partition-homeManager-home`](./flake-modules/partition-homeManager-home.nix) \
 Automatically imported: Yes, if not overridden
 
-This module iterates over the directory configured by the `homeConfigurationPath` module argument and imports all nix files, except `flake.nix` and `flake-module.nix`, as well as all base-level directories, which include a `default.nix` file, exposing them through the flake-parts `flake.homeConfiguration` interface.
+The module includes either the `default.nix` file, should it be present, or recursively finds all nix files (traversing non-includible directories) and includible directories. Base-level files with the names `flake.nix`, and `flake-module.nix` will be ignored. The base directory for those looksups is taken from the module argument `homeConfigurationPath`. All such discovered homes are exposed through a single home module importing all of them at the flake-parts `flake.homeConfiguration` interface.
 
 The following extra arguments are passed to homes, if they are in the format `extraArgs: args: { ... }`:
 
@@ -163,7 +163,7 @@ The name of the output is the inverted directory structure with `/` replaced by 
 Provided via flake: [`partition-nixos-module`](./flake-modules/partition-nixos-module.nix) \
 Automatically imported: Yes, if not overridden
 
-This module iterates over the directory configured by the `nixosModulePath` module argument and imports all nix files, except `flake.nix` and `flake-module.nix`, as well as all base-level directories, which include a `default.nix` file, exposing them through the flake-parts `flake.nixosModule` interface.
+The module includes either the `default.nix` file, should it be present, or recursively finds all nix files (traversing non-includible directories) and includible directories. Base-level files with the names `flake.nix`, and `flake-module.nix` will be ignored. The base directory for those looksups is taken from the module argument `nixosModulePath`. All such discovered modules are exposed through a single module importing all of them at the flake-parts `flake.nixosModule` interface.
 
 The following extra arguments are passed to modules, if they are in the format `extraArgs: args: { ... }`:
 
@@ -183,7 +183,7 @@ This module reads the metadata of the system from the `system-metadata.nix` file
 - nix-utils-lib
 
 Using the metadata a new configuration is created through the `lib.nixosSystem` function of `nixpkgs`. Any metadata-supplied modules and overlays are applied.
-The module also includes either the `default.nix` file, should it be present, or recursively finds all  nix files (traversing non-includible directories) and includible directories. Base-level files with the names `flake.nix`, `flake-module.nix`, and `system-metadata.nix` will be ignored.
+The module also includes either the `default.nix` file, should it be present, or recursively finds all nix files (traversing non-includible directories) and includible directories. Base-level files with the names `flake.nix`, `flake-module.nix`, and `system-metadata.nix` will be ignored.
 
 The metadata is structured as follows:
 

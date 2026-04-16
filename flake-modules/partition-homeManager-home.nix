@@ -24,10 +24,11 @@ in
               (
                 nix-utils-lib.readImportablePaths {
                   dir = homeConfigurationPath;
-                  exclude = [
+                  excludeTopLevel = [
                     "flake.nix"
                     "flake-module.nix"
                   ];
+                  recursive = true;
                 }
               );
         };
