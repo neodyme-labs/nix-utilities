@@ -19,9 +19,7 @@
     flake-parts.lib.mkFlake { inherit inputs; } (
       { flake-parts-lib, ... }:
       let
-        dogfood = flake-parts-lib.importApply ./flake-modules/default.nix {
-          inherit flake-parts nix-utils-lib;
-        };
+        dogfood = flake-parts-lib.importApply ./flake-modules/default.nix { inherit inputs nix-utils-lib; };
       in
       {
         systems = [ "x86_64-linux" ];

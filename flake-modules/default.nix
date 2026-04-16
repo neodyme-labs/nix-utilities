@@ -1,4 +1,4 @@
-{ flake-parts, nix-utils-lib }:
+{ inputs, nix-utils-lib }:
 { config, lib, ... }:
 
 let
@@ -57,7 +57,7 @@ let
 in
 {
   # We depend on partitions and so does every consumer, so import the module
-  imports = [ flake-parts.flakeModules.partitions ];
+  imports = [ inputs.flake-parts.flakeModules.partitions ];
 
   options.nixUtilities = {
     root = lib.mkOption {
