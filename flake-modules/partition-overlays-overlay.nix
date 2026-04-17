@@ -24,7 +24,7 @@ in
             (
               { path, ... }@args:
               {
-                name = partLib.stripNixSuffix args;
+                name = nix-utils-lib.stripNixSuffix args;
 
                 value =
                   (nix-utils-lib.callWithIfNestedFunc 2 (import path) (

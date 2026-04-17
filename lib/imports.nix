@@ -140,4 +140,8 @@ rec {
       parts = [ ];
       topLevel = true;
     };
+
+  stripNixSuffix =
+    { path, type }:
+    if type == "regular" then lib.removeSuffix ".nix" (baseNameOf path) else baseNameOf path;
 }

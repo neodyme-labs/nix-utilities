@@ -21,7 +21,7 @@ in
             (
               { path, ... }@args:
               {
-                name = partLib.stripNixSuffix args;
+                name = nix-utils-lib.stripNixSuffix args;
                 value = pkgs.callPackage (import path) (
                   config.allModuleArgs // { inherit inputs nix-utils-lib self; }
                 );

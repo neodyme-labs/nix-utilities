@@ -20,6 +20,6 @@ lib.makeExtensible (
 
     inherit (functions) callWith callWithIfNestedFunc;
 
-    inherit (imports) isDirectoryIncludible readImportablePaths;
+    inherit (imports) isDirectoryIncludible readImportablePaths stripNixSuffix;
   }
 )

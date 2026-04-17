@@ -13,7 +13,7 @@ in
           (
             { path, ... }@args:
             {
-              name = partLib.stripNixSuffix args;
+              name = nix-utils-lib.stripNixSuffix args;
 
               # The following kind of modules are supported:
               # extraArgs: args: { ... }

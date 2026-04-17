@@ -1,15 +1,11 @@
 { lib, nix-utils-lib }:
 
-rec {
-  stripNixSuffix =
-    { path, type }:
-    if type == "regular" then lib.removeSuffix ".nix" (baseNameOf path) else baseNameOf path;
-
+{
   walk =
     {
       importFunc ? import,
       module,
-      nameFunc ? stripNixSuffix,
+      nameFunc ? nix-utils-lib.stripNixSuffix,
       outputName,
       partitions,
       paths,
