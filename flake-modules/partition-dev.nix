@@ -9,7 +9,6 @@
 
 let
   cfg = config.nixUtilities;
-  partLib = (import ./internal/lib.nix) { inherit lib nix-utils-lib; };
 in
 {
   perSystem =

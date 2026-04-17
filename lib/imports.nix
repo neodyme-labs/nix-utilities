@@ -4,6 +4,31 @@ let
   inherit (nix-utils-lib) verifyFileType;
 in
 rec {
+  importAsAttrs =
+    {
+      nameFunc ? stripNixSuffix,
+      importFunc ? ({ path, ... }: import path),
+      ...
+    }@args:
+    builtins.listToAttrs (
+      map
+        (
+          { path, ... }@mapArgs:
+          {
+            name = nameFunc mapArgs;
+            value = importFunc mapArgs;
+          }
+        )
+        (
+          readImportablePaths (
+            removeAttrs args [
+              "nameFunc"
+              "importFunc"
+            ]
+          )
+        )
+    );
+
   /**
     `isDirectoryIncludible` checks if a directory contains a regular `default.nix` file,
     making it suitable for Nix importation.

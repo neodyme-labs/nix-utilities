@@ -8,7 +8,6 @@
 
 let
   defaultNix = overlayPath + "/default.nix";
-  partLib = (import ./internal/lib.nix) { inherit lib nix-utils-lib; };
 in
 {
   flake = {

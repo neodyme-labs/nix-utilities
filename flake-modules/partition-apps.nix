@@ -9,7 +9,6 @@
 
 let
   dir = config.nixUtilities.paths.appsDirectory;
-  partLib = (import ./internal/lib.nix) { inherit lib nix-utils-lib; };
 in
 {
   perSystem =

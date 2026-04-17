@@ -3,7 +3,6 @@
 
 let
   dir = config.nixUtilities.paths.flakeModulesDirectory;
-  partLib = (import ./internal/lib.nix) { inherit lib nix-utils-lib; };
 in
 {
   flake = {
