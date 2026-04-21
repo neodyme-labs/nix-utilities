@@ -2,6 +2,7 @@
 {
   config,
   inputs,
+  nixosConfigurationName,
   nixosConfigurationPath,
   ...
 }:
@@ -55,7 +56,11 @@ in
                   }
                 );
 
-          config.nixpkgs = { inherit (metadata) hostPlatform overlays; };
+          config = {
+            nixpkgs = { inherit (metadata) hostPlatform overlays; };
+
+            _module.args = { inherit nixosConfigurationName nixosConfigurationPath; };
+          };
         }
       ]
       ++ metadata.modules;
