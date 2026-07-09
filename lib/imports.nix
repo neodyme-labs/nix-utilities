@@ -147,7 +147,7 @@ rec {
               in
               if includeRegular && type == "regular" && lib.hasSuffix ".nix" name then
                 candidate
-              else if includeDirectories && dirIncludibilityCheck (fullPath name) then
+              else if includeDirectories && type == "directory" && dirIncludibilityCheck (fullPath name) then
                 candidate
               else if recursive && type == "directory" then
                 recurse { parts = parts ++ [ name ]; }
