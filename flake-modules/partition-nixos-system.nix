@@ -23,10 +23,21 @@ let
     };
 
   defaultNix = nixosConfigurationPath + "/default.nix";
+
+  # This host's own fully-resolved inputs (root inputs merged with this system's
+  # own extraInputsFlake, if any). Exposed to modules as a NixOS specialArg named
+  # `hostInputs`, distinct from a module's own eagerly-resolved `inputs`, so a
+  # shared module can be written to prefer a host's override while still falling
+  # back to whatever it itself (or the root flake) already defines, e.g.:
+  #   { inputs, ... }: { config, lib, hostInputs, ... }:
+  #   let effectiveInputs = inputs // hostInputs; in { ... }
+  hostInputs = inputs;
 in
 {
   flake = {
     nixosConfiguration = metadata.nixpkgs.lib.nixosSystem {
+      specialArgs = { inherit hostInputs; };
+
       modules = [
         {
           imports =
