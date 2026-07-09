@@ -37,6 +37,7 @@ let
 
     nixos = {
       attrs = [
+        "nixosConfigurationExtra"
         "nixosConfigurations"
         "nixosModules"
       ];

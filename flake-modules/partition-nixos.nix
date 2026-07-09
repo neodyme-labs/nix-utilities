@@ -70,6 +70,40 @@ let
           path: nix-utils-lib.verifyFileType "regular" (path + "/system-metadata.nix");
       };
     })
+
+    # Same tree as above, but only exposes each host's cheap `extra` metadata
+    # (see partition-nixos-system.nix) - reading it never forces that host's
+    # `nixosSystem` evaluation, unlike `nixosConfigurations.<name>.config`.
+    (partLib.walk rec {
+      inherit (config) partitions;
+
+      dir = cfg.paths.nixosDirectory + "/systems";
+      module = flake-parts-lib.importApply ./partition-nixos-system.nix partitionArgs;
+      outputName = "nixosConfigurationExtra";
+
+      # Must stay "nixosConfiguration" (not "nixosConfigurationExtra") - this
+      # names the `_module.args` (`nixosConfigurationName`/`Path`) that
+      # partition-nixos-system.nix's function signature actually expects,
+      # regardless of which sibling flake attribute this walk picks below.
+      subOutputName = "nixosConfiguration";
+      flakeAttr = "nixosConfigurationExtra";
+
+      nameFunc =
+        { path, ... }:
+        lib.concatStringsSep "." (
+          lib.reverseList (lib.splitString "/" (lib.removePrefix "${toString dir}/" (toString path)))
+        );
+
+      paths = nix-utils-lib.readImportablePaths {
+        inherit dir;
+
+        includeRegular = false;
+        recursive = true;
+
+        dirIncludibilityCheck =
+          path: nix-utils-lib.verifyFileType "regular" (path + "/system-metadata.nix");
+      };
+    })
   ];
 in
 {

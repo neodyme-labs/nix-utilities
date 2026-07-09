@@ -10,6 +10,15 @@
       partitions,
       paths,
       subOutputName,
+      # The flake attribute this walk aggregates from each partition's
+      # `flake.*` output - defaults to `subOutputName` (the original
+      # behaviour), but can differ from it when a second walk targets the
+      # same underlying partitions to pick out a *different* sibling flake
+      # attribute (e.g. exposing a lightweight `nixosConfigurationExtra`
+      # alongside the real `nixosConfiguration`, from the same module,
+      # without needing to also rename the `${subOutputName}Name`/`Path`
+      # specialArgs the partition module expects).
+      flakeAttr ? subOutputName,
       ...
     }@walkArgs:
     let
@@ -24,7 +33,7 @@
             value = {
               value =
                 if type == "directory" then
-                  partitions."${outputName}.${name}".module.flake.${subOutputName}
+                  partitions."${outputName}.${name}".module.flake.${flakeAttr}
                 else
                   importFunc path;
 
