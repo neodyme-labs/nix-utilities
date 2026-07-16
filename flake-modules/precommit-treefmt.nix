@@ -21,9 +21,12 @@ _:
         inherit pkgs;
 
         settings = {
-          hooks.nixfmt = {
+          hooks.treefmt = {
             enable = true;
-            args = [ "--strict" ];
+            # The stock hook runs a bare treefmt without the project's config
+            # or formatters; substitute the treefmt-nix wrapper, which
+            # carries both.
+            packageOverrides.treefmt = config.treefmt.build.wrapper;
           };
         };
       };
