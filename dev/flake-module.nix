@@ -8,4 +8,10 @@
     self.flakeModules.partition-dev
     self.flakeModules.precommit-treefmt
   ];
+
+  perSystem = {
+    treefmt = {
+      programs.statix.enable = true;
+    };
+  };
 }

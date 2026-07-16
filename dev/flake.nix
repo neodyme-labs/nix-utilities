@@ -25,11 +25,9 @@
     };
   };
 
-  outputs =
-    { ... }:
-    {
-      # The dev tooling is in ./flake-module.nix
-      # See comment at `inputs` above.
-      # It is loaded into partitions.dev by the root flake.
-    };
+  outputs = _: {
+    # The dev tooling is in ./flake-module.nix
+    # See comment at `inputs` above.
+    # It is loaded into partitions.dev by the root flake.
+  };
 }
