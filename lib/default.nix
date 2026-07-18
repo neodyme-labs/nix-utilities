@@ -11,20 +11,28 @@ lib.makeExtensible (
         nix-utils-lib = self;
       };
   in
-  rec {
+  {
     files = callLibs ./files.nix;
     functions = callLibs ./functions.nix;
     imports = callLibs ./imports.nix;
 
-    inherit (files) verifyFileType;
+    # Alias through the fixpoint (not rec) so `extend` overrides propagate
+    inherit (self.files) verifyFileType;
 
-    inherit (functions) callWith callWithIfNestedFunc;
+    inherit (self.functions)
+      callWith
+      callWithContext
+      callWithIfNestedFunc
+      callWithIfNestedFuncContext
+      ;
 
-    inherit (imports)
+    inherit (self.imports)
+      dirContainsNixFiles
       importAsAttrs
       isDirectoryIncludible
       readImportablePaths
       stripNixSuffix
+      uniqueListToAttrs
       ;
   }
 )
