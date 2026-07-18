@@ -3,81 +3,80 @@
 
 let
   cfg = config.nixUtilities;
-  partLib = (import ./internal/lib.nix) { inherit lib nix-utils-lib; };
+  partLib = import ./internal/lib.nix { inherit lib nix-utils-lib; };
+
+  # Layout and semantics: README "homeManager". homes/ is deliberately its
+  # own directory - user homes and shared modules diverge in multi-user
+  # setups - and home-configurations/ is decoupled from both, so a home
+  # stays host-embeddable (osConfig, per-host pkgs) while standalone
+  # builds are opt-in per configuration.
+  # Module and home files support the extraArgs convention (README "The
+  # extraArgs convention"), hence the probe.
+  extraArgsImportFunc =
+    path:
+    nix-utils-lib.callWithIfNestedFuncContext (toString path) 1 (import path) (
+      config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
+    );
+
+  modulesWalk = partLib.walk rec {
+    inherit (config) partitions;
+
+    dir = cfg.paths.homeManagerDirectory + "/modules";
+    module = flake-parts-lib.importApply ./partition-homeManager-module.nix partitionArgs;
+    outputName = "homeModules";
+    subOutputName = "homeModule";
+
+    importFunc = extraArgsImportFunc;
+    paths = nix-utils-lib.readImportablePaths (partLib.discovery.moduleTree dir);
+  };
+
+  homesWalk = partLib.walk rec {
+    inherit (config) partitions;
+
+    dir = cfg.paths.homeManagerDirectory + "/homes";
+    module = flake-parts-lib.importApply ./partition-homeManager-home.nix partitionArgs;
+    outputName = "homes";
+    subOutputName = "home";
+
+    importFunc = extraArgsImportFunc;
+    paths = nix-utils-lib.readImportablePaths (partLib.discovery.moduleTree dir);
+  };
+
+  configurationsWalk = partLib.walk rec {
+    inherit (config) partitions;
+
+    dir = cfg.paths.homeManagerDirectory + "/home-configurations";
+    module = flake-parts-lib.importApply ./partition-homeManager-configuration.nix partitionArgs;
+    outputName = "homeConfigurations";
+    subOutputName = "homeConfiguration";
+
+    paths = nix-utils-lib.readImportablePaths (partLib.discovery.homeConfigurations dir);
+  };
 
   walks = [
-    # The following modules structure is supported:
-    #   modules/
-    #   +-- <name>.nix            - Included as module
-    #   +-- <name>/               - Sub-partition for a module
-    #       +-- default.nix       - Our implementation: included if present, recursively includes all other nix files, or includible directories otherwise
-    #       +-- flake.{nix,lock}  - Additional inputs for the sub-partition
-    #       +-- flake-module.nix  - Overrides our implementation if present
-    (partLib.walk rec {
-      inherit (config) partitions;
-
-      dir = cfg.paths.homeManagerDirectory + "/modules";
-      module = flake-parts-lib.importApply ./partition-homeManager-module.nix partitionArgs;
-      outputName = "homeModules";
-      subOutputName = "homeModule";
-
-      # The following kind of modules are supported:
-      # extraArgs: args: { }
-      # args: { }
-      # { }
-      importFunc =
-        path:
-        nix-utils-lib.callWithIfNestedFunc 1 (import path) (
-          config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
-        );
-
-      paths = nix-utils-lib.readImportablePaths {
-        inherit dir;
-        dirIncludibilityCheck = _: true; # All directories are allowed
-      };
-    })
-
-    # The following home structure is supported:
-    #   homes/
-    #   +-- <name>.nix            - Included as home
-    #   +-- <name>/               - Sub-partition for a home
-    #       +-- default.nix       - Our implementation: included if present, recursively includes all other nix files, or includible directories otherwise
-    #       +-- flake.{nix,lock}  - Additional inputs for the sub-partition
-    #       +-- flake-module.nix  - Overrides our implementation if present
-    (partLib.walk rec {
-      inherit (config) partitions;
-
-      dir = cfg.paths.homeManagerDirectory + "/homes";
-      module = flake-parts-lib.importApply ./partition-homeManager-home.nix partitionArgs;
-      outputName = "homeConfigurations";
-      subOutputName = "homeConfiguration";
-
-      # The following kind of homes are supported:
-      # extraArgs: args: { }
-      # args: { }
-      # { }
-      importFunc =
-        path:
-        nix-utils-lib.callWithIfNestedFunc 1 (import path) (
-          config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
-        );
-
-      paths = nix-utils-lib.readImportablePaths {
-        inherit dir;
-        dirIncludibilityCheck = _: true; # All directories are allowed
-      };
-    })
+    modulesWalk
+    homesWalk
+    configurationsWalk
   ];
 in
 {
-  flake = lib.foldr (
-    walk: acc:
-    acc
-    // {
-      "${walk.outputName}" =
-        lib.optionalAttrs (nix-utils-lib.verifyFileType "directory" walk.dir) walk.flakeOutputs;
-    }
-  ) { } walks;
+  # The attrs themselves are conditional (not just their values): defining
+  # them as { } would claim flake outputs the layout does not provide.
+  flake =
+    lib.foldr (
+      walk: acc:
+      acc
+      // lib.optionalAttrs (nix-utils-lib.verifyFileType "directory" walk.dir) {
+        "${walk.outputName}" = walk.flakeOutputs;
+      }
+    ) { } walks
+    // lib.optionalAttrs (nix-utils-lib.verifyFileType "directory" configurationsWalk.dir) {
+      # Cheap per-home facts, readable without forcing a home's build -
+      # mirrors flake.nixosConfigurationExtras (see partition-nixos.nix).
+      homeConfigurationExtras = lib.mapAttrs (
+        name: _: config.partitions."homeConfigurations.${name}".module.flake.homeConfigurationExtra
+      ) configurationsWalk.flakeOutputs;
+    };
 
   partitions = lib.foldr (
     walk: acc:

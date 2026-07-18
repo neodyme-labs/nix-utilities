@@ -3,54 +3,114 @@
 
 let
   cfg = config.nixUtilities;
+  partLib = import ./internal/lib.nix { inherit lib nix-utils-lib; };
 
+  moduleTreeHasEntries = partLib.hasEntries partLib.discovery.moduleTree;
+  entriesHasEntries = partLib.hasEntries partLib.discovery.entries;
+
+  # Each partition maps its flake output attrs to the sub-directory backing
+  # them (null: the partition directory itself) and a content probe. An attr
+  # is only claimed when its backing directory exists and the probe finds
+  # content, so the flake never grows empty outputs. The dev attrs carry no
+  # probe: their content can come from flake-module.nix modules (git-hooks
+  # checks, a treefmt-nix formatter), which discovery cannot see.
   managedPartitions = {
     apps = {
-      attrs = [ "apps" ];
+      attrs = {
+        apps = {
+          hasContent = entriesHasEntries;
+        };
+      };
+
       partition = ./partition-apps.nix;
     };
 
     dev = {
-      attrs = [
-        "checks"
-        "devShells"
-        "formatter"
-      ];
+      attrs = {
+        checks = { };
+        devShells = { };
+        formatter = { };
+      };
 
       partition = ./partition-dev.nix;
     };
 
     flakeModules = {
-      attrs = [ "flakeModules" ];
+      attrs = {
+        flakeModules = {
+          hasContent = entriesHasEntries;
+        };
+      };
+
       partition = ./partition-flakeModules.nix;
       subPath = "flake-modules";
     };
 
     homeManager = {
-      attrs = [
-        "homeConfigurations"
-        "homeModules"
-      ];
+      attrs = {
+        homeConfigurationExtras = {
+          subPath = "home-configurations";
+          hasContent = partLib.hasEntries partLib.discovery.homeConfigurations;
+        };
+
+        homeConfigurations = {
+          subPath = "home-configurations";
+          hasContent = partLib.hasEntries partLib.discovery.homeConfigurations;
+        };
+
+        homeModules = {
+          subPath = "modules";
+          hasContent = moduleTreeHasEntries;
+        };
+
+        homes = {
+          subPath = "homes";
+          hasContent = moduleTreeHasEntries;
+        };
+      };
+
       partition = ./partition-homeManager.nix;
       subPath = "home-manager";
     };
 
     nixos = {
-      attrs = [
-        "nixosConfigurationExtra"
-        "nixosConfigurations"
-        "nixosModules"
-      ];
+      attrs = {
+        nixosConfigurationExtras = {
+          subPath = "systems";
+          hasContent = partLib.hasEntries partLib.discovery.systems;
+        };
+
+        nixosConfigurations = {
+          subPath = "systems";
+          hasContent = partLib.hasEntries partLib.discovery.systems;
+        };
+
+        nixosModules = {
+          subPath = "modules";
+          hasContent = moduleTreeHasEntries;
+        };
+      };
+
       partition = ./partition-nixos.nix;
     };
 
     overlays = {
-      attrs = [ "overlays" ];
+      attrs = {
+        overlays = {
+          hasContent = moduleTreeHasEntries;
+        };
+      };
+
       partition = ./partition-overlays.nix;
     };
 
     packages = {
-      attrs = [ "packages" ];
+      attrs = {
+        packages = {
+          hasContent = entriesHasEntries;
+        };
+      };
+
       optionNamePrefix = "pkgs";
       partition = ./partition-packages.nix;
     };
@@ -67,7 +127,6 @@ in
       description = "Base path used for default paths.";
     };
 
-    # Path options are derived from the managedPartitions config
     paths = lib.mapAttrs' (
       name:
       {
@@ -86,7 +145,7 @@ in
           '';
 
           description = ''
-            Path to the partition exposing ${lib.concatStringsSep ", " attrs}
+            Path to the partition exposing ${lib.concatStringsSep ", " (lib.attrNames attrs)}
           '';
         };
       }
@@ -95,7 +154,6 @@ in
 
   config =
     let
-      # We only care about partitions that are actually present in the current layout
       validPartitions = lib.filterAttrs (
         name:
         {
@@ -109,18 +167,47 @@ in
       ) managedPartitions;
     in
     {
-      # Expose nix-utils-lib as an argument to all flake modules
-      _module.args = { inherit nix-utils-lib; };
+      # Expose nix-utils-lib as an argument to all flake modules. lib rides
+      # along because it is a module-system built-in rather than a module
+      # argument: it appears in neither _module.args nor specialArgs (nor
+      # allModuleArgs), so without this no discovered file could ask for it.
+      _module.args = { inherit lib nix-utils-lib; };
+      perSystem = {
+        _module.args = { inherit lib nix-utils-lib; };
+      };
 
       partitionedAttrs = lib.listToAttrs (
         lib.flatten (
           lib.mapAttrsToList (
             partName:
-            { attrs, ... }:
-            map (attr: {
-              name = attr;
-              value = partName;
-            }) attrs
+            {
+              attrs,
+              optionNamePrefix ? partName,
+              ...
+            }:
+            let
+              path = cfg.paths."${optionNamePrefix}Directory";
+            in
+            lib.mapAttrsToList (
+              attr:
+              {
+                subPath ? null,
+                hasContent ? null,
+              }:
+              let
+                backing = if subPath == null then path else path + "/${subPath}";
+              in
+              lib.optional
+                (
+                  # Existence first: the content probes read the directory
+                  (subPath == null || nix-utils-lib.verifyFileType "directory" backing)
+                  && (hasContent == null || hasContent backing)
+                )
+                {
+                  name = attr;
+                  value = partName;
+                }
+            ) attrs
           ) validPartitions
         )
       );
@@ -142,7 +229,7 @@ in
             if isRegularFile (path + "/flake-module.nix") then
               path + "/flake-module.nix"
             else
-              nix-utils-lib.callWith (import partition) (
+              nix-utils-lib.callWithContext (toString partition) (import partition) (
                 config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
               );
         }

@@ -2,7 +2,6 @@
 {
   config,
   inputs,
-  lib,
   nixosConfigurationName,
   nixosConfigurationPath,
   ...
@@ -11,7 +10,9 @@
 let
   metadata =
     let
-      content = nix-utils-lib.callWith (import (nixosConfigurationPath + "/system-metadata.nix")) (
+      metadataFile = nixosConfigurationPath + "/system-metadata.nix";
+
+      content = nix-utils-lib.callWithContext (toString metadataFile) (import metadataFile) (
         config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
       );
     in
@@ -44,10 +45,10 @@ in
   flake = {
     # Exposed separately from `nixosConfiguration` (not merged into its
     # `.config`) so reading it never forces this host's module tree - see the
-    # `extra` field above. `mkForce`d since this attr has no dedicated
-    # merge-friendly option type (unlike `nixosConfiguration`/`nixosModule`,
-    # which flake-parts' own machinery declares specially).
-    nixosConfigurationExtra = lib.mkForce metadata.extra;
+    # `extra` field above. Singular next to the singular `nixosConfiguration`;
+    # the aggregate output is the plural `nixosConfigurationExtras`, so the
+    # two definitions never collide.
+    nixosConfigurationExtra = metadata.extra;
 
     nixosConfiguration = metadata.nixpkgs.lib.nixosSystem {
       specialArgs = { inherit hostInputs; };
@@ -57,7 +58,7 @@ in
           imports =
             if nix-utils-lib.verifyFileType "regular" defaultNix then
               [
-                (nix-utils-lib.callWithIfNestedFunc 1 (import defaultNix) (
+                (nix-utils-lib.callWithIfNestedFuncContext (toString defaultNix) 1 (import defaultNix) (
                   config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
                 ))
               ]
@@ -65,18 +66,20 @@ in
               map
                 (
                   { path, ... }:
-                  (nix-utils-lib.callWithIfNestedFunc 1 (import path) (
+                  (nix-utils-lib.callWithIfNestedFuncContext (toString path) 1 (import path) (
                     config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
                   ))
                 )
                 (
                   nix-utils-lib.readImportablePaths {
                     dir = nixosConfigurationPath;
+
                     excludeTopLevel = [
                       "flake.nix"
                       "flake-module.nix"
                       "system-metadata.nix"
                     ];
+
                     recursive = true;
                   }
                 );

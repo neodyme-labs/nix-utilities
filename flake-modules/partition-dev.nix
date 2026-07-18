@@ -9,6 +9,7 @@
 
 let
   cfg = config.nixUtilities;
+  partLib = import ./internal/lib.nix { inherit lib nix-utils-lib; };
 in
 {
   perSystem =
@@ -17,16 +18,17 @@ in
       importDir =
         dir:
         lib.optionalAttrs (nix-utils-lib.verifyFileType "directory" dir) (
-          builtins.listToAttrs (
+          nix-utils-lib.uniqueListToAttrs (
             map (
               { path, ... }@args:
               {
+                inherit path;
                 name = nix-utils-lib.stripNixSuffix args;
-                value = nix-utils-lib.callWith (import path) (
+                value = nix-utils-lib.callWithContext (toString path) (import path) (
                   config.allModuleArgs // { inherit inputs nix-utils-lib self; }
                 );
               }
-            ) (nix-utils-lib.readImportablePaths { inherit dir; })
+            ) (nix-utils-lib.readImportablePaths (partLib.discovery.entries dir))
           )
         );
     in
@@ -34,13 +36,22 @@ in
       checks = importDir (cfg.paths.devDirectory + "/checks");
       devShells = importDir (cfg.paths.devDirectory + "/shells");
 
-      # Priority 1001 is 1 less than mkDefault (used by treefmt-nix and the like)
+      # One step weaker than mkDefault (1000), so treefmt-nix and the like
+      # can take over the formatter without friction
       formatter = lib.mkOverride 1001 (
         let
           path = cfg.paths.devDirectory + "/formatter.nix";
         in
         if nix-utils-lib.verifyFileType "regular" path then
-          pkgs.callPackage (import path) (config.allModuleArgs // { inherit inputs nix-utils-lib self; })
+          # callPackageWith intersects the extra arguments with the function's
+          # parameters; passing them as callPackage's explicit args would force
+          # them all onto a formatter.nix lacking `...`. pkgs is merged last:
+          # allModuleArgs carries the perSystem `config` (and module-system
+          # `lib`), which would shadow the nixpkgs meaning nixpkgs-style files
+          # expect (`config.allowUnfree`, `pkgs.lib`).
+          lib.callPackageWith (
+            config.allModuleArgs // { inherit inputs nix-utils-lib self; } // pkgs
+          ) (import path) { }
         else
           null
       );

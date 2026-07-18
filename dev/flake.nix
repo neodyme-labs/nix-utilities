@@ -6,7 +6,7 @@
     # As a consequence, this flake only provides dependencies, and
     # we can't use the `nix` CLI as expected.
 
-    nixpkgs.url = "github:NixOS/nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";

@@ -3,118 +3,72 @@
 
 let
   cfg = config.nixUtilities;
-  partLib = (import ./internal/lib.nix) { inherit lib nix-utils-lib; };
+  partLib = import ./internal/lib.nix { inherit lib nix-utils-lib; };
+
+  # Layout and semantics: README "nixos".
+  modulesWalk = partLib.walk rec {
+    inherit (config) partitions;
+
+    dir = cfg.paths.nixosDirectory + "/modules";
+    module = flake-parts-lib.importApply ./partition-nixos-module.nix partitionArgs;
+    outputName = "nixosModules";
+    subOutputName = "nixosModule";
+
+    # Module files support the extraArgs convention (README "The extraArgs
+    # convention"), hence the probe.
+    importFunc =
+      path:
+      nix-utils-lib.callWithIfNestedFuncContext (toString path) 1 (import path) (
+        config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
+      );
+
+    paths = nix-utils-lib.readImportablePaths (partLib.discovery.moduleTree dir);
+  };
+
+  systemsWalk = partLib.walk rec {
+    inherit (config) partitions;
+
+    dir = cfg.paths.nixosDirectory + "/systems";
+    module = flake-parts-lib.importApply ./partition-nixos-system.nix partitionArgs;
+    outputName = "nixosConfigurations";
+    subOutputName = "nixosConfiguration";
+
+    # systems/one/example/host -> host.example.one, so FQDN-structured
+    # layouts name their configurations by FQDN.
+    nameFunc =
+      { path, ... }:
+      lib.concatStringsSep "." (
+        lib.reverseList (lib.splitString "/" (lib.removePrefix "${toString dir}/" (toString path)))
+      );
+
+    paths = nix-utils-lib.readImportablePaths (partLib.discovery.systems dir);
+  };
 
   walks = [
-    # The following modules structure is supported:
-    #   modules/
-    #   +-- <name>.nix            - Included as module
-    #   +-- <name>/               - Sub-partition for a module
-    #       +-- default.nix       - Our implementation: included if present, recursively includes all other nix files, or includible directories otherwise
-    #       +-- flake.{nix,lock}  - Additional inputs for the sub-partition
-    #       +-- flake-module.nix  - Overrides our implementation if present
-    (partLib.walk rec {
-      inherit (config) partitions;
-
-      dir = cfg.paths.nixosDirectory + "/modules";
-      module = flake-parts-lib.importApply ./partition-nixos-module.nix partitionArgs;
-      outputName = "nixosModules";
-      subOutputName = "nixosModule";
-
-      # The following kind of modules are supported:
-      # extraArgs: args: { }
-      # args: { }
-      # { }
-      importFunc =
-        path:
-        nix-utils-lib.callWithIfNestedFunc 1 (import path) (
-          config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
-        );
-
-      paths = nix-utils-lib.readImportablePaths {
-        inherit dir;
-        dirIncludibilityCheck = _: true; # All directories are allowed
-      };
-    })
-
-    # The following system structure is supported:
-    #   systems/
-    #     +-- <name>/
-    #     |   +-- default.nix         - Our implementation: included if present, recursively includes all other nix files, or includible directories otherwise
-    #     |   +-- flake.{nix,lock}    - Additional inputs for the sub-partition
-    #     |   +-- flake-module.nix    - Overrides our implementation if present
-    #     |   +-- system-metadata.nix - Tracks metadata such as system, required
-    #     +-- <tld>/<subdomain.domain>/<name>/
-    #         -- same as above --
-    (partLib.walk rec {
-      inherit (config) partitions;
-
-      dir = cfg.paths.nixosDirectory + "/systems";
-      module = flake-parts-lib.importApply ./partition-nixos-system.nix partitionArgs;
-      outputName = "nixosConfigurations";
-      subOutputName = "nixosConfiguration";
-
-      nameFunc =
-        { path, ... }:
-        lib.concatStringsSep "." (
-          lib.reverseList (lib.splitString "/" (lib.removePrefix "${toString dir}/" (toString path)))
-        );
-
-      paths = nix-utils-lib.readImportablePaths {
-        inherit dir;
-
-        includeRegular = false;
-        recursive = true;
-
-        dirIncludibilityCheck =
-          path: nix-utils-lib.verifyFileType "regular" (path + "/system-metadata.nix");
-      };
-    })
-
-    # Same tree as above, but only exposes each host's cheap `extra` metadata
-    # (see partition-nixos-system.nix) - reading it never forces that host's
-    # `nixosSystem` evaluation, unlike `nixosConfigurations.<name>.config`.
-    (partLib.walk rec {
-      inherit (config) partitions;
-
-      dir = cfg.paths.nixosDirectory + "/systems";
-      module = flake-parts-lib.importApply ./partition-nixos-system.nix partitionArgs;
-      outputName = "nixosConfigurationExtra";
-
-      # Must stay "nixosConfiguration" (not "nixosConfigurationExtra") - this
-      # names the `_module.args` (`nixosConfigurationName`/`Path`) that
-      # partition-nixos-system.nix's function signature actually expects,
-      # regardless of which sibling flake attribute this walk picks below.
-      subOutputName = "nixosConfiguration";
-      flakeAttr = "nixosConfigurationExtra";
-
-      nameFunc =
-        { path, ... }:
-        lib.concatStringsSep "." (
-          lib.reverseList (lib.splitString "/" (lib.removePrefix "${toString dir}/" (toString path)))
-        );
-
-      paths = nix-utils-lib.readImportablePaths {
-        inherit dir;
-
-        includeRegular = false;
-        recursive = true;
-
-        dirIncludibilityCheck =
-          path: nix-utils-lib.verifyFileType "regular" (path + "/system-metadata.nix");
-      };
-    })
+    modulesWalk
+    systemsWalk
   ];
 in
 {
-  flake = lib.foldr (
-    walk: acc:
-    acc
-    // {
-      "${walk.outputName}" =
-        lib.optionalAttrs (nix-utils-lib.verifyFileType "directory" walk.dir) walk.flakeOutputs;
-    }
-  ) { } walks;
+  # The attrs themselves are conditional (not just their values): defining
+  # them as { } would claim flake outputs the layout does not provide.
+  flake =
+    lib.foldr (
+      walk: acc:
+      acc
+      // lib.optionalAttrs (nix-utils-lib.verifyFileType "directory" walk.dir) {
+        "${walk.outputName}" = walk.flakeOutputs;
+      }
+    ) { } walks
+    // lib.optionalAttrs (nix-utils-lib.verifyFileType "directory" systemsWalk.dir) {
+      # Cheap host facts (see partition-nixos-system.nix), readable without
+      # forcing a host's nixosSystem evaluation. Derived from the systems
+      # walk so each host keeps a single partition; mapAttrs only forces the
+      # attribute names, which preserves that laziness.
+      nixosConfigurationExtras = lib.mapAttrs (
+        name: _: config.partitions."nixosConfigurations.${name}".module.flake.nixosConfigurationExtra
+      ) systemsWalk.flakeOutputs;
+    };
 
   partitions = lib.foldr (
     walk: acc:
