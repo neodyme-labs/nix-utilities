@@ -9,8 +9,11 @@ layout, the recipes, and the sharp edges; the flake-parts documentation is a
 good primer if partitions are new to you.
 
 > [!IMPORTANT]
-> This repository has been completely refactored. The `main` branch currently
-> holds the legacy version; use the `v2` branch for the current one.
+> This is the second generation (v2) of nix-utilities, a complete rewrite of
+> the original. See [RELEASE-NOTES.md](RELEASE-NOTES.md) for what changed;
+> the previous generation remains available on the
+> [`legacy`](https://github.com/neodyme-labs/nix-utilities/tree/legacy)
+> branch.
 
 ## How do I...
 
@@ -25,7 +28,7 @@ good primer if partitions are new to you.
     };
 
     nix-utilities = {
-      url = "github:neodyme-labs/nix-utilities/v2";
+      url = "github:neodyme-labs/nix-utilities";
       inputs = {
         flake-parts.follows = "flake-parts";
         nixpkgs-lib.follows = "nixpkgs-lib";
