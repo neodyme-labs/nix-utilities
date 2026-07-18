@@ -8,7 +8,7 @@ in
   flake = {
     homeModule =
       if nix-utils-lib.verifyFileType "regular" defaultNix then
-        nix-utils-lib.callWithIfNestedFunc 1 (import defaultNix) (
+        nix-utils-lib.callWithIfNestedFuncContext (toString defaultNix) 1 (import defaultNix) (
           config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
         )
       else
@@ -17,7 +17,7 @@ in
             map
               (
                 { path, ... }:
-                nix-utils-lib.callWithIfNestedFunc 1 (import path) (
+                nix-utils-lib.callWithIfNestedFuncContext (toString path) 1 (import path) (
                   config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
                 )
               )
