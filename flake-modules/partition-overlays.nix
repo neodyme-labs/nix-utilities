@@ -12,29 +12,23 @@ let
     outputName = "overlays";
     subOutputName = "overlay";
 
-    # The following kind of overlays are supported:
-    # extraArgs: final: prev: { }
-    # final: prev: { }
+    # File overlays support the extraArgs convention (README "overlays"),
+    # hence the depth-2 probe.
     importFunc =
       path:
-      nix-utils-lib.callWithIfNestedFunc 2 (import path) (
+      nix-utils-lib.callWithIfNestedFuncContext (toString path) 2 (import path) (
         config._module.args // config._module.specialArgs // { inherit nix-utils-lib; }
       );
 
-    paths = nix-utils-lib.readImportablePaths {
-      inherit dir;
-      dirIncludibilityCheck = _: true; # All directories are allowed
-
-      exclude = [
-        "flake.nix"
-        "flake-module.nix"
-      ];
-    };
+    paths = nix-utils-lib.readImportablePaths (partLib.discovery.moduleTree dir);
   };
 in
 {
-  flake."${walk.outputName}" =
-    lib.optionalAttrs (nix-utils-lib.verifyFileType "directory" walk.dir) walk.flakeOutputs;
+  # The attr itself is conditional (not just its value): defining it as { }
+  # would claim a flake output the layout does not actually provide.
+  flake = lib.optionalAttrs (nix-utils-lib.verifyFileType "directory" walk.dir) {
+    "${walk.outputName}" = walk.flakeOutputs;
+  };
 
   partitions = lib.optionalAttrs (nix-utils-lib.verifyFileType "directory" walk.dir) (
     lib.mapAttrs' (name: value: {
