@@ -6,16 +6,19 @@ description: Rewrite the current branch's history in place (same split-off point
 # Refactor the current branch's history
 
 Rewrites the branch onto its EXISTING split-off point - this is history
-cleanup, not a rebase onto newer main. The target shape is defined by
-CLAUDE.md's git rule (logical units, mechanical churn separated,
-Conventional-Commit messages) - read it first; this skill only adds the
-mechanics.
+cleanup, not a rebase onto a newer default branch. The target shape is
+defined by the
+repo's git conventions (logical units, mechanical churn separated,
+Conventional-Commit messages) in its CLAUDE.md and linked docs - read
+them first; this skill only adds the mechanics.
 
 ## Steps
 
-1. **Preconditions**: refuse on `main`; require a clean worktree (ask the
-   user to commit - e.g. via /commit - or stash first). Determine the
-   base: `git merge-base main HEAD` (fall back to `origin/main`).
+1. **Preconditions**: determine the default branch
+   (`git symbolic-ref refs/remotes/origin/HEAD`, falling back to `main`)
+   and refuse to run on it; require a clean worktree (ask the user to
+   commit - e.g. via /commit - or stash first). Determine the base:
+   `git merge-base <default-branch> HEAD`.
 
 2. **Safety first**: create a backup ref at HEAD:
    `git branch backup/<branch>-$(date +%Y%m%d-%H%M%S)`. If the branch has
@@ -52,8 +55,8 @@ mechanics.
    any mismatch or a failed rebase, `git reset --hard <backup-ref>` and
    report what happened.
 
-7. **Verify and report**: run `nix flake check --no-build` and
-   `nix fmt -- --fail-on-change` on the tip (skip when the user passed
-   `no-check`), show the resulting `git log --oneline`, and name the
-   backup ref for rollback. Never push - if the branch was already
-   published, tell the user a force-push is theirs to do.
+7. **Verify and report**: run the repo's checks (its verify skill or
+   check script) on the tip (skip when the user passed `no-check`), show
+   the resulting `git log --oneline`, and name the backup ref for
+   rollback. Never push - if the branch was already published, tell the
+   user a force-push is theirs to do.
